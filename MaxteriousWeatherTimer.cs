@@ -6,6 +6,10 @@ using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using System.Net.Http;
+using System;
+using System.Diagnostics;
+using static Utils;
 
 namespace weatherTimer
 {
@@ -13,10 +17,12 @@ namespace weatherTimer
     public class MaxteriousWeatherTimer
     {
         private readonly EmailService _emailService;
+        private readonly HttpClient _httpClient;
 
-        public MaxteriousWeatherTimer(EmailService emailService)
+        public MaxteriousWeatherTimer(EmailService emailService, HttpClient httpClient)
         {
             _emailService = emailService;
+            _httpClient = httpClient;
         }
 
         public class FormData
@@ -25,33 +31,40 @@ namespace weatherTimer
             public string Message { get; set; }
         }
 
+        public class Customer
+        {
+            public string Email { get; set; }
+            public string City { get; set; }
+        }
+
 
         [FunctionName("MaxteriousWeatherTimer")]
-        public async Task<IActionResult> RunAsync([TimerTrigger("0 0 * * * *")] TimerInfo myTimer, ILogger log)
+        public async Task RunAsync([TimerTrigger("0 0 * * * *")] TimerInfo myTimer, ILogger log)
         {
-            string requestBody = "";
-            var formData = JsonConvert.DeserializeObject<FormData>(requestBody);
+            log.LogInformation($"Running timer function to send weather notifications: {DateTime.Now}");
 
-            var sender = formData.Sender;
-            var message = formData.Message;
+            string azureCustomerEndpoint = Environment.GetEnvironmentVariable("GetCustomersAzureEndpoint");
+            var customersReq = new HttpRequestMessage(HttpMethod.Get, azureCustomerEndpoint);
 
-            if (!Utils.ValidateString(sender, 30) || !Utils.ValidateEmailFormat(sender))
+            var customersResponse = await _httpClient.SendAsync(customersReq);
+            var customersContent = await customersResponse.Content.ReadAsStringAsync();
+            var customers = JsonConvert.DeserializeObject<Customer[]>(customersContent);
+
+            foreach (Customer c in customers)
             {
-                return new BadRequestObjectResult(new { error = "Invalid sender email" });
+                var weatherReq = new HttpRequestMessage(HttpMethod.Get, $"https://weatherFunction?city={c.City}");
+                var weatherResponse = await _httpClient.SendAsync(weatherReq);
+                var weatherContent = await weatherResponse.Content.ReadAsStringAsync();
+                WeatherApiResponse weatherData = JsonConvert.DeserializeObject<WeatherApiResponse>(weatherContent);
+
+                // Access the condition text and code
+                string conditionText = weatherData.Current.Condition.Text;
+                int conditionCode = weatherData.Current.Condition.Code;
+
+                await _emailService.SendEmailAsync(c.Email, "The weather condition: " + conditionText);
             }
 
-            if (!Utils.ValidateString(message, 500))
-            {
-                return new BadRequestObjectResult(new { error = "Invalid message" });
-            }
-
-            var result = await _emailService.SendEmailAsync(sender, message);
-            if (result != "Email sent successfully.")
-            {
-                return new StatusCodeResult(500);
-            }
-
-            return new OkObjectResult(new { data = result });
+            log.LogInformation("The function has finished running.");
         }
     }
 }
