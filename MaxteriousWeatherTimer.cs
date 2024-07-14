@@ -61,7 +61,7 @@ namespace weatherTimer
                 string conditionText = weatherData.Current.Condition.Text;
                 int conditionCode = weatherData.Current.Condition.Code;
 
-                await _emailService.SendEmailAsync(c.Email, "The weather condition: " + conditionText);
+                await _emailService.SendEmailAsync(c.Email, "The weather condition in " + c.City + " is " + conditionText);
             }
 
             log.LogInformation("The function has finished running.");
