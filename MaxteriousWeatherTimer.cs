@@ -41,8 +41,14 @@ namespace weatherTimer
         {
             log.LogInformation($"Running timer function to send weather notifications: {DateTime.Now}");
 
-            string azureCustomerEndpoint = Environment.GetEnvironmentVariable("GetCustomersAzureEndpoint");
+            string azureCustomerEndpoint = Environment.GetEnvironmentVariable("CustomerAzureEndpoint");
+            string azureWeatherEndpoint = Environment.GetEnvironmentVariable("WeatherAzureEndpoint");
             string ReSendAPI = Environment.GetEnvironmentVariable("RESEND_API");
+            if (string.IsNullOrEmpty(azureCustomerEndpoint) || string.IsNullOrEmpty(azureWeatherEndpoint) || string.IsNullOrEmpty(ReSendAPI))
+            {
+                log.LogError("Environment variables 'GetCustomersAzureEndpoint' or 'RESEND_API' are not set.");
+                return;
+            }
             var emailService = new EmailService(_httpClient, ReSendAPI);
 
             var customersReq = new HttpRequestMessage(HttpMethod.Get, azureCustomerEndpoint);
@@ -53,7 +59,7 @@ namespace weatherTimer
 
             foreach (Customer c in customers)
             {
-                var weatherReq = new HttpRequestMessage(HttpMethod.Get, $"https://weatherFunction?city={c.City}");
+                var weatherReq = new HttpRequestMessage(HttpMethod.Get, $"${azureWeatherEndpoint}?city={c.City}");
                 var weatherResponse = await _httpClient.SendAsync(weatherReq);
                 var weatherContent = await weatherResponse.Content.ReadAsStringAsync();
                 WeatherApiResponse weatherData = JsonConvert.DeserializeObject<WeatherApiResponse>(weatherContent);
