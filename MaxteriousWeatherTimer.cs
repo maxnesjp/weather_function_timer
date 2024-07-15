@@ -16,12 +16,10 @@ namespace weatherTimer
 
     public class MaxteriousWeatherTimer
     {
-        private readonly EmailService _emailService;
         private readonly HttpClient _httpClient;
 
-        public MaxteriousWeatherTimer(EmailService emailService, HttpClient httpClient)
+        public MaxteriousWeatherTimer(HttpClient httpClient)
         {
-            _emailService = emailService;
             _httpClient = httpClient;
         }
 
@@ -44,6 +42,9 @@ namespace weatherTimer
             log.LogInformation($"Running timer function to send weather notifications: {DateTime.Now}");
 
             string azureCustomerEndpoint = Environment.GetEnvironmentVariable("GetCustomersAzureEndpoint");
+            string ReSendAPI = Environment.GetEnvironmentVariable("RESEND_API");
+            var emailService = new EmailService(_httpClient, ReSendAPI);
+
             var customersReq = new HttpRequestMessage(HttpMethod.Get, azureCustomerEndpoint);
 
             var customersResponse = await _httpClient.SendAsync(customersReq);
@@ -60,8 +61,7 @@ namespace weatherTimer
                 // Access the condition text and code
                 string conditionText = weatherData.Current.Condition.Text;
                 int conditionCode = weatherData.Current.Condition.Code;
-
-                await _emailService.SendEmailAsync(c.Email, "The weather condition in " + c.City + " is " + conditionText);
+                await emailService.SendEmailAsync(c.Email, "The weather condition in " + c.City + " is " + conditionText);
             }
 
             log.LogInformation("The function has finished running.");
