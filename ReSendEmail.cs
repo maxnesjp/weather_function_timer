@@ -1,16 +1,15 @@
 using System;
 using System.Net.Http;
-using System.Net.Http.Json;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
-public class EmailService
+public class ReSendEmail : IEmailService
 {
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
 
-    public EmailService(HttpClient httpClient, string apiKey)
+    public ReSendEmail(HttpClient httpClient, string apiKey)
     {
         _httpClient = httpClient;
         _apiKey = apiKey;
